@@ -1,6 +1,6 @@
 const express = require("express");
-const crypto = require("crypto");
 const mongoose = require("mongoose");
+const crypto = require("crypto");
 const cors = require("cors");
 require("dotenv").config();
 
@@ -20,7 +20,7 @@ mongoose
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// Define API Key Schema
+// API Key Schema
 const apiKeySchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true },
   userId: { type: String, required: true },
@@ -29,12 +29,12 @@ const apiKeySchema = new mongoose.Schema({
 
 const ApiKey = mongoose.model("ApiKey", apiKeySchema);
 
-// Route: Home
+// Root route
 app.get("/", (req, res) => {
-  res.send("API is running...");
+  res.send("✅ API is running...");
 });
 
-// Route: Generate API Key
+// Generate API Key route
 app.post("/generate-key", async (req, res) => {
   const { userId } = req.body;
 
@@ -47,14 +47,14 @@ app.post("/generate-key", async (req, res) => {
   try {
     const newKey = new ApiKey({ key: apiKey, userId });
     await newKey.save();
-
     res.json({ apiKey });
   } catch (err) {
-    console.error("Error generating key:", err);
-    res.status(500).json({ error: "Failed to generate key" });
+    console.error("❌ Error generating key:", err);
+    res.status(500).json({ error: "Failed to generate API key" });
   }
 });
 
+// Start server
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
