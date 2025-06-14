@@ -50,10 +50,7 @@ app.post("/create-checkout-session", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
   
-app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
   
 });
 
@@ -93,6 +90,10 @@ app.get("/protected", async (req, res) => {
   await keyData.save();
 
   res.json({ message: "You accessed a protected resource!" });
+  app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.get("/", (req, res) => res.send("API is running..."));
