@@ -8,7 +8,7 @@ const path = require("path");
 
 const app = express();
 
-// Stripe webhook (needs raw body)
+// ✅ Stripe Webhook FIRST – uses raw body
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
@@ -39,12 +39,12 @@ app.post(
   }
 );
 
-// Apply middleware AFTER webhook to avoid raw body issues
+// ✅ AFTER webhook: middleware for JSON + static files
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// MongoDB connection
+// ✅ MongoDB connection
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -53,7 +53,7 @@ mongoose
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB error:", err));
 
-// Mongoose model for API keys
+// ✅ Mongoose model
 const ApiKeySchema = new mongoose.Schema({
   userEmail: String,
   key: String,
@@ -62,12 +62,20 @@ const ApiKeySchema = new mongoose.Schema({
 });
 const ApiKey = mongoose.model("ApiKey", ApiKeySchema);
 
-// Serve static frontend
+// ✅ Serve index.html
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Stripe checkout session route
+// ✅ Serve success and cancel pages
+app.get("/success.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "success.html"));
+});
+app.get("/cancel.html", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "cancel.html"));
+});
+
+// ✅ Stripe checkout session
 app.post("/create-checkout-session", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email is required" });
@@ -83,8 +91,8 @@ app.post("/create-checkout-session", async (req, res) => {
         },
       ],
       customer_email: email,
-      success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL}/cancel`,
+      success_url: `${process.env.FRONTEND_URL}/success.html?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.FRONTEND_URL}/cancel.html`,
     });
 
     res.json({ url: session.url });
@@ -94,7 +102,7 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// Protected API route that requires a valid API key
+// ✅ Protected API route
 app.get("/protected", async (req, res) => {
   const apiKey = req.headers["x-api-key"];
   if (!apiKey) return res.status(401).json({ error: "API key required" });
@@ -112,7 +120,7 @@ app.get("/protected", async (req, res) => {
   res.json({ message: "Access granted! ✅" });
 });
 
-// Start the server
+// ✅ Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
