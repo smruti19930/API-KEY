@@ -90,6 +90,8 @@ app.get("/protected", async (req, res) => {
   await keyData.save();
 
   res.json({ message: "You accessed a protected resource!" });
+
+  app.use(express.json());
   app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
