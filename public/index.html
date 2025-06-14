@@ -10,7 +10,7 @@
   <script>
     async function subscribe() {
       const email = document.getElementById("email").value;
-      const res = await fetch("https://your-api.onrender.com/create-checkout-session", {
+      const res = await fetch("https://api-c2zh.onrender.com/create-checkout-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email })
