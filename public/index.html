@@ -1,7 +1,56 @@
 
 <!DOCTYPE html>
 <html>
-<head><title>Subscribe</title></head>
+<head><title>Subscribe</title>
+  <style>
+    body {
+      background: #f3f4f6;
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    h2 {
+      color: #333;
+    }
+
+    input[type="email"] {
+      padding: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin-bottom: 15px;
+      width: 280px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      color: #fff;
+      background-color: #6366f1;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #4f46e5;
+    }
+
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 12px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+  </style>
+</head>
 <body>
   <h2>Subscribe to use the API</h2>
   <input type="email" id="email" placeholder="Enter email" />
