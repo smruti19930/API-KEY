@@ -49,6 +49,12 @@ app.post("/create-checkout-session", async (req, res) => {
     console.error("Checkout error:", err);
     res.status(500).json({ error: err.message });
   }
+  
+app.use(express.static(path.join(__dirname, 'public')));
+
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  
 });
 
 // ✅ Webhook for Stripe to confirm payment
