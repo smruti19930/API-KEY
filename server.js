@@ -4,11 +4,16 @@ const mongoose = require("mongoose");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const crypto = require("crypto");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ✅ Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ✅ MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
@@ -16,7 +21,7 @@ mongoose.connect(process.env.MONGO_URI, {
 .then(() => console.log('MongoDB connected'))
 .catch((err) => console.error('MongoDB connection error:', err));
 
-
+// ✅ Mongoose Model
 const ApiKeySchema = new mongoose.Schema({
   userEmail: String,
   key: String,
@@ -25,7 +30,7 @@ const ApiKeySchema = new mongoose.Schema({
 });
 const ApiKey = mongoose.model("ApiKey", ApiKeySchema);
 
-// ✅ Create checkout session
+// ✅ Checkout Session
 app.post("/create-checkout-session", async (req, res) => {
   const { email } = req.body;
 
@@ -49,12 +54,9 @@ app.post("/create-checkout-session", async (req, res) => {
     console.error("Checkout error:", err);
     res.status(500).json({ error: err.message });
   }
-  
-
-  
 });
 
-// ✅ Webhook for Stripe to confirm payment
+// ✅ Webhook
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   let event;
 
@@ -78,7 +80,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   res.sendStatus(200);
 });
 
-// ✅ Middleware to check quota
+// ✅ Protected route
 app.get("/protected", async (req, res) => {
   const apiKey = req.headers["x-api-key"];
   const keyData = await ApiKey.findOne({ key: apiKey });
@@ -90,15 +92,13 @@ app.get("/protected", async (req, res) => {
   await keyData.save();
 
   res.json({ message: "You accessed a protected resource!" });
-
-  app.use(express.json());
-  app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get("/", (req, res) => res.send("API is running..."));
+// ✅ Home route (serving index.html)
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
 
+// ✅ Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
