@@ -1,49 +1,63 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Payment Successful</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 40px;
-      text-align: center;
+      background: #f0f4f8;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
     }
-    #apiKey {
-      margin-top: 20px;
-      background: #f1f1f1;
-      padding: 10px;
-      font-size: 18px;
-      border: 1px dashed #888;
+
+    .container {
+      background: #ffffff;
+      padding: 40px;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      max-width: 400px;
+    }
+
+    h2 {
+      color: #27ae60;
+      margin-bottom: 20px;
+    }
+
+    p {
+      font-size: 16px;
+      color: #333;
+    }
+
+    .btn {
       display: inline-block;
+      margin-top: 20px;
+      padding: 10px 20px;
+      background-color: #27ae60;
+      color: white;
+      text-decoration: none;
+      border-radius: 6px;
+      transition: background 0.3s;
+    }
+
+    .btn:hover {
+      background-color: #219150;
     }
   </style>
 </head>
 <body>
-  <h1>🎉 Payment Successful</h1>
-  <p>Your API key has been generated. Copy it below:</p>
-  <div id="apiKey">Loading...</div>
+  <div class="container">
+    <h2>✅ Payment Successful</h2>
+    <p>Your subscription was successful.</p>
+    <p>Your API key has been generated and sent to your email.</p>
+    <p>If you do not see the email, please check your spam folder.</p>
 
-  <script>
-    async function fetchApiKey() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const sessionId = urlParams.get("session_id");
-
-      if (!sessionId) {
-        document.getElementById("apiKey").textContent = "Session ID missing in URL.";
-        return;
-      }
-
-      try {
-        const res = await fetch(`/get-api-key?session_id=${sessionId}`);
-        const data = await res.json();
-        document.getElementById("apiKey").textContent = data.apiKey || "API key not found.";
-      } catch (err) {
-        document.getElementById("apiKey").textContent = "Error fetching API key.";
-        console.error(err);
-      }
-    }
-
-    fetchApiKey();
-  </script>
+    <a href="/" class="btn">Go to Homepage</a>
+  </div>
 </body>
 </html>
