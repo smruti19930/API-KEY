@@ -2,9 +2,48 @@
 <html>
 <head>
   <title>Payment Successful</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 40px;
+      text-align: center;
+    }
+    #apiKey {
+      margin-top: 20px;
+      background: #f1f1f1;
+      padding: 10px;
+      font-size: 18px;
+      border: 1px dashed #888;
+      display: inline-block;
+    }
+  </style>
 </head>
 <body>
-  <h2>🎉 Payment Successful</h2>
-  <p>Your API Key has been generated and sent to the database!</p>
+  <h1>🎉 Payment Successful</h1>
+  <p>Your API key has been generated. Copy it below:</p>
+  <div id="apiKey">Loading...</div>
+
+  <script>
+    async function fetchApiKey() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get("session_id");
+
+      if (!sessionId) {
+        document.getElementById("apiKey").textContent = "Session ID missing in URL.";
+        return;
+      }
+
+      try {
+        const res = await fetch(`/get-api-key?session_id=${sessionId}`);
+        const data = await res.json();
+        document.getElementById("apiKey").textContent = data.apiKey || "API key not found.";
+      } catch (err) {
+        document.getElementById("apiKey").textContent = "Error fetching API key.";
+        console.error(err);
+      }
+    }
+
+    fetchApiKey();
+  </script>
 </body>
 </html>
