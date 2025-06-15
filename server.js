@@ -8,7 +8,7 @@ const path = require("path");
 
 const app = express();
 
-// ✅ Stripe Webhook FIRST – uses raw body
+// Webhook requires raw body
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
@@ -29,9 +29,15 @@ app.post(
     if (event.type === "checkout.session.completed") {
       const session = event.data.object;
       const email = session.customer_email;
+      const sessionId = session.id;
       const apiKey = crypto.randomBytes(24).toString("hex");
 
-      await ApiKey.create({ userEmail: email, key: apiKey });
+      await ApiKey.create({
+        userEmail: email,
+        key: apiKey,
+        sessionId,
+      });
+
       console.log(`✅ API Key generated for ${email}`);
     }
 
@@ -39,12 +45,12 @@ app.post(
   }
 );
 
-// ✅ AFTER webhook: middleware for JSON + static files
+// Apply middlewares AFTER webhook
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ MongoDB connection
+// MongoDB Connection
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -53,29 +59,17 @@ mongoose
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ MongoDB error:", err));
 
-// ✅ Mongoose model
+// MongoDB Schema
 const ApiKeySchema = new mongoose.Schema({
   userEmail: String,
   key: String,
+  sessionId: String,
   requests: { type: Number, default: 0 },
   maxRequests: { type: Number, default: 1000 },
 });
 const ApiKey = mongoose.model("ApiKey", ApiKeySchema);
 
-// ✅ Serve index.html
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// ✅ Serve success and cancel pages
-app.get("/success.html", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "success.html"));
-});
-app.get("/cancel.html", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "cancel.html"));
-});
-
-// ✅ Stripe checkout session
+// Route to create Stripe checkout session
 app.post("/create-checkout-session", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email is required" });
@@ -102,7 +96,18 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// ✅ Protected API route
+// Endpoint to fetch API key after payment
+app.get("/get-api-key", async (req, res) => {
+  const sessionId = req.query.session_id;
+  if (!sessionId) return res.status(400).json({ error: "Session ID required" });
+
+  const apiKeyDoc = await ApiKey.findOne({ sessionId });
+  if (!apiKeyDoc) return res.status(404).json({ error: "API Key not found" });
+
+  res.json({ apiKey: apiKeyDoc.key });
+});
+
+// Protected route using API key
 app.get("/protected", async (req, res) => {
   const apiKey = req.headers["x-api-key"];
   if (!apiKey) return res.status(401).json({ error: "API key required" });
@@ -117,11 +122,11 @@ app.get("/protected", async (req, res) => {
   keyData.requests += 1;
   await keyData.save();
 
-  res.json({ message: "Access granted! ✅" });
+  res.json({ message: "✅ Access granted!" });
 });
 
-// ✅ Start server
-const PORT = process.env.PORT || 3000;
+// Start server
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
