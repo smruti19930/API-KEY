@@ -39,9 +39,10 @@ const ApiKeySchema = new mongoose.Schema({
 });
 const ApiKey = mongoose.model("ApiKey", ApiKeySchema);
 
-// ✅ Webhook route (raw body required before express.json)
+// ✅ Webhook route (before JSON middleware)
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   let event;
+
   try {
     event = stripe.webhooks.constructEvent(
       req.body,
@@ -49,7 +50,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       process.env.STRIPE_WEBHOOK_SECRET
     );
   } catch (err) {
-    console.error("❌ Webhook signature error:", err.message);
+    console.error("Webhook signature error:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -59,31 +60,32 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     const apiKey = crypto.randomBytes(24).toString("hex");
 
     await ApiKey.create({ userEmail: email, key: apiKey });
+    console.log(`✅ API Key generated for ${email}`);
 
+    // ✅ Send email with API key
     await transporter.sendMail({
       from: `API Service <${process.env.EMAIL_USER}>`,
       to: email,
       subject: "Your API Key",
-      html: `<p>Thanks for subscribing! 🚀</p><p>Your API key: <b>${apiKey}</b></p>`
+      html: `<p>Thank you for subscribing!</p><p>Your API key is: <b>${apiKey}</b></p>`
     });
-
-    console.log(`✅ API Key created and emailed to ${email}`);
+    console.log(`📧 API Key emailed to ${email}`);
   }
 
   res.sendStatus(200);
 });
 
-// ✅ Middleware (after webhook)
+// ✅ Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ Serve homepage
+// ✅ Homepage
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// ✅ Stripe checkout session route
+// ✅ Create Stripe checkout session
 app.post("/create-checkout-session", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email is required" });
@@ -105,14 +107,18 @@ app.post("/create-checkout-session", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("❌ Checkout error:", err.message);
+    console.error("Checkout error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// ✅ Protected API endpoint (supports RapidAPI)
+// ✅ Protected API endpoint
 app.get("/protected", async (req, res) => {
+  console.log("📥 Headers received:", req.headers);
+
   const apiKey = req.headers["x-api-key"] || req.headers["x-rapidapi-key"];
+  console.log("🔑 Parsed API key:", apiKey);
+
   if (!apiKey) return res.status(401).json({ error: "API key required" });
 
   const keyData = await ApiKey.findOne({ key: apiKey });
