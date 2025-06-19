@@ -21,16 +21,17 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ✅ MongoDB connection
+// ✅ MongoDB connection with explicit DB name
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    dbName: "sample_mflix", // 👈 Ensure correct DB is used
   })
-  .then(() => console.log("✅ MongoDB connected"))
+  .then(() => console.log("✅ MongoDB connected to sample_mflix"))
   .catch((err) => console.error("❌ MongoDB error:", err));
 
-// ✅ API Key schema
+// ✅ API Key schema and model
 const ApiKeySchema = new mongoose.Schema({
   userEmail: String,
   key: String,
@@ -40,46 +41,48 @@ const ApiKeySchema = new mongoose.Schema({
 const ApiKey = mongoose.model("ApiKey", ApiKeySchema);
 
 // ✅ Webhook route (before JSON middleware)
-app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  console.log("Webhook received");
-
-  let event;
-
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      req.headers["stripe-signature"],
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error("Webhook signature error:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const email = session.customer_email;
-    const apiKey = crypto.randomBytes(24).toString("hex");
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    let event;
 
     try {
-      await ApiKey.create({ userEmail: email, key: apiKey });
-      console.log(`✅ API Key generated and saved for ${email}`);
-
-      await transporter.sendMail({
-        from: `API Service <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: "Your API Key",
-        html: `<p>Thank you for subscribing!</p><p>Your API key is: <b>${apiKey}</b></p>`,
-      });
-      console.log(`📧 API Key emailed to ${email}`);
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        req.headers["stripe-signature"],
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
     } catch (err) {
-      console.error("Error saving API key or sending email:", err);
-      return res.status(500).send("Internal Server Error");
+      console.error("❌ Webhook signature error:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
-  }
 
-  res.sendStatus(200);
-});
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const email = session.customer_email;
+      const apiKey = crypto.randomBytes(24).toString("hex");
+
+      try {
+        await ApiKey.create({ userEmail: email, key: apiKey });
+        console.log(`✅ API Key saved for ${email}`);
+
+        await transporter.sendMail({
+          from: `API Service <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: "Your API Key",
+          html: `<p>Thank you for subscribing!</p><p>Your API key is: <b>${apiKey}</b></p>`,
+        });
+
+        console.log(`📧 API Key emailed to ${email}`);
+      } catch (err) {
+        console.error("❌ Error saving API key or sending email:", err);
+      }
+    }
+
+    res.sendStatus(200);
+  }
+);
 
 // ✅ Middleware
 app.use(cors());
@@ -113,18 +116,14 @@ app.post("/create-checkout-session", async (req, res) => {
 
     res.json({ url: session.url });
   } catch (err) {
-    console.error("Checkout error:", err);
+    console.error("❌ Checkout error:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
 // ✅ Protected API endpoint
 app.get("/protected", async (req, res) => {
-  console.log("📥 Headers received:", req.headers);
-
   const apiKey = req.headers["x-api-key"] || req.headers["x-rapidapi-key"];
-  console.log("🔑 Parsed API key:", apiKey);
-
   if (!apiKey) return res.status(401).json({ error: "API key required" });
 
   const keyData = await ApiKey.findOne({ key: apiKey });
@@ -140,15 +139,13 @@ app.get("/protected", async (req, res) => {
   res.json({ message: "Access granted! ✅" });
 });
 
-// ✅ Debug route to check stored API keys
+// ✅ Endpoint to check stored API keys (for debugging)
 app.get("/check-api-keys", async (req, res) => {
   try {
-    const keys = await ApiKey.find({});
-    if (keys.length === 0) return res.json({ message: "No API keys found" });
+    const keys = await ApiKey.find().lean();
     res.json(keys);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Server error" });
+    res.status(500).json({ error: "Error fetching keys" });
   }
 });
 
