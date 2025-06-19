@@ -112,7 +112,7 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 app.get("/protected", async (req, res) => {
-  const apiKey = req.headers["x-api-key"];
+  const apiKey = req.headers["x-api-key"] || req.headers["x-rapidapi-key"];
   if (!apiKey) return res.status(401).json({ error: "API key required" });
 
   const keyData = await ApiKey.findOne({ key: apiKey });
