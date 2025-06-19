@@ -41,6 +41,8 @@ const ApiKey = mongoose.model("ApiKey", ApiKeySchema);
 
 // ✅ Webhook route (before JSON middleware)
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  console.log("Webhook received");
+
   let event;
 
   try {
@@ -59,17 +61,21 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     const email = session.customer_email;
     const apiKey = crypto.randomBytes(24).toString("hex");
 
-    await ApiKey.create({ userEmail: email, key: apiKey });
-    console.log(`✅ API Key generated for ${email}`);
+    try {
+      await ApiKey.create({ userEmail: email, key: apiKey });
+      console.log(`✅ API Key generated and saved for ${email}`);
 
-    // ✅ Send email with API key
-    await transporter.sendMail({
-      from: `API Service <${process.env.EMAIL_USER}>`,
-      to: email,
-      subject: "Your API Key",
-      html: `<p>Thank you for subscribing!</p><p>Your API key is: <b>${apiKey}</b></p>`
-    });
-    console.log(`📧 API Key emailed to ${email}`);
+      await transporter.sendMail({
+        from: `API Service <${process.env.EMAIL_USER}>`,
+        to: email,
+        subject: "Your API Key",
+        html: `<p>Thank you for subscribing!</p><p>Your API key is: <b>${apiKey}</b></p>`,
+      });
+      console.log(`📧 API Key emailed to ${email}`);
+    } catch (err) {
+      console.error("Error saving API key or sending email:", err);
+      return res.status(500).send("Internal Server Error");
+    }
   }
 
   res.sendStatus(200);
@@ -132,6 +138,18 @@ app.get("/protected", async (req, res) => {
   await keyData.save();
 
   res.json({ message: "Access granted! ✅" });
+});
+
+// ✅ Debug route to check stored API keys
+app.get("/check-api-keys", async (req, res) => {
+  try {
+    const keys = await ApiKey.find({});
+    if (keys.length === 0) return res.json({ message: "No API keys found" });
+    res.json(keys);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
 
 // ✅ Start server
