@@ -21,18 +21,22 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ✅ Log the MongoDB URI (masked for safety)
-console.log("Connecting to MongoDB with URI:", process.env.MONGO_URI.replace(/(\/\/.+@)(.+)(\/.+)/, "$1***$3"));
+// ✅ Log the MongoDB URI (masked password)
+console.log(
+  "Connecting to MongoDB with URI:",
+  process.env.MONGO_URI.replace(/(\/\/.+:)(.+)(@.+)/, "$1***$3")
+);
 
-// ✅ MongoDB connection
+// ✅ MongoDB connection with explicit dbName to avoid default 'mydb'
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    dbName: "sample_mflix", // Force correct DB here!
   })
   .catch((err) => {
     console.error("❌ MongoDB connection error:", err);
-    process.exit(1); // exit if DB connection fails
+    process.exit(1);
   });
 
 mongoose.connection.on("connected", () => {
@@ -40,10 +44,10 @@ mongoose.connection.on("connected", () => {
 });
 
 mongoose.connection.on("error", (err) => {
-  console.error("❌ MongoDB error:", err);
+  console.error("❌ MongoDB connection error:", err);
 });
 
-// ✅ API Key schema and model
+// ✅ API Key schema & model
 const ApiKeySchema = new mongoose.Schema({
   userEmail: String,
   key: String,
@@ -53,44 +57,48 @@ const ApiKeySchema = new mongoose.Schema({
 const ApiKey = mongoose.model("ApiKey", ApiKeySchema);
 
 // ✅ Webhook route (before JSON middleware)
-app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
-  let event;
-
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      req.headers["stripe-signature"],
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error("Webhook signature error:", err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
-  }
-
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const email = session.customer_email;
-    const apiKey = crypto.randomBytes(24).toString("hex");
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    let event;
 
     try {
-      const doc = await ApiKey.create({ userEmail: email, key: apiKey });
-      console.log(`✅ API Key saved to DB for ${email}: ${doc.key}`);
-
-      // ✅ Send email with API key
-      await transporter.sendMail({
-        from: `API Service <${process.env.EMAIL_USER}>`,
-        to: email,
-        subject: "Your API Key",
-        html: `<p>Thank you for subscribing!</p><p>Your API key is: <b>${apiKey}</b></p>`,
-      });
-      console.log(`📧 API Key emailed to ${email}`);
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        req.headers["stripe-signature"],
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
     } catch (err) {
-      console.error("❌ Error saving API key to DB or sending email:", err);
+      console.error("Webhook signature error:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
-  }
 
-  res.sendStatus(200);
-});
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const email = session.customer_email;
+      const apiKey = crypto.randomBytes(24).toString("hex");
+
+      try {
+        await ApiKey.create({ userEmail: email, key: apiKey });
+        console.log(`✅ API Key saved to DB for ${email}: ${apiKey}`);
+
+        // Send email with API key
+        await transporter.sendMail({
+          from: `API Service <${process.env.EMAIL_USER}>`,
+          to: email,
+          subject: "Your API Key",
+          html: `<p>Thank you for subscribing!</p><p>Your API key is: <b>${apiKey}</b></p>`,
+        });
+        console.log(`📧 API Key emailed to ${email}`);
+      } catch (dbErr) {
+        console.error("❌ Error saving API key or sending email:", dbErr);
+      }
+    }
+
+    res.sendStatus(200);
+  }
+);
 
 // ✅ Middleware
 app.use(cors());
@@ -151,8 +159,8 @@ app.get("/protected", async (req, res) => {
 
     res.json({ message: "Access granted! ✅" });
   } catch (err) {
-    console.error("❌ Error during API key validation:", err);
-    res.status(500).json({ error: "Internal server error" });
+    console.error("Error checking API key:", err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
