@@ -40,7 +40,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Webhook must come before express.json
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   let event;
 
@@ -63,7 +62,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     try {
       const keyRecord = await ApiKey.create({ userEmail: email, key: apiKey });
       console.log(`✅ API Key created for ${email}: ${apiKey}`);
-      
+
       await transporter.sendMail({
         from: `API Service <${process.env.EMAIL_USER}>`,
         to: email,
@@ -111,8 +110,16 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
+// For RapidAPI monetization: bypass MongoDB check if x-rapidapi-key is used
 app.get("/protected", async (req, res) => {
-  const apiKey = req.headers["x-api-key"] || req.headers["x-rapidapi-key"];
+  const apiKey = req.headers["x-api-key"];
+  const rapidKey = req.headers["x-rapidapi-key"];
+
+  if (rapidKey) {
+    // Monetized through RapidAPI - no MongoDB check required
+    return res.json({ message: "Access granted via RapidAPI ✅" });
+  }
+
   if (!apiKey) return res.status(401).json({ error: "API key required" });
 
   const keyData = await ApiKey.findOne({ key: apiKey });
@@ -124,7 +131,7 @@ app.get("/protected", async (req, res) => {
 
   keyData.requests += 1;
   await keyData.save();
-  res.json({ message: "Access granted ✅" });
+  res.json({ message: "Access granted via Stripe API Key ✅" });
 });
 
 const PORT = process.env.PORT || 5000;
