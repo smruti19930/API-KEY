@@ -12,6 +12,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+// Debug middleware - logs all incoming headers (remove or comment out after testing)
+app.use((req, res, next) => {
+  console.log("Incoming headers:", req.headers);
+  next();
+});
+
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -20,7 +26,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Webhook: Stripe Checkout for your own MongoDB-based key system (optional)
+// Stripe webhook endpoint (optional)
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   let event;
 
@@ -41,7 +47,6 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     const apiKey = crypto.randomBytes(24).toString("hex");
 
     try {
-      // Just email, not storing to DB now
       await transporter.sendMail({
         from: `API Service <${process.env.EMAIL_USER}>`,
         to: email,
@@ -61,7 +66,7 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Stripe Checkout Session (for your own site, optional)
+// Stripe checkout session (optional)
 app.post("/create-checkout-session", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
@@ -86,7 +91,7 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// ✅ RAPIDAPI PROTECTED ENDPOINT (no manual key validation!)
+// RAPIDAPI PROTECTED ENDPOINT — no manual key validation
 app.get("/protected", (req, res) => {
   const apiKey = req.headers["x-rapidapi-key"];
 
@@ -94,7 +99,7 @@ app.get("/protected", (req, res) => {
     return res.status(401).json({ error: "Missing X-RapidAPI-Key header" });
   }
 
-  // Do NOT validate key manually — RapidAPI handles validation & billing
+  // Let RapidAPI do the validation & billing
   res.json({ message: "✅ Access granted via RapidAPI" });
 });
 
