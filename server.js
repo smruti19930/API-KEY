@@ -1,8 +1,5 @@
-// Hybrid server.js with both MongoDB key logic and RapidAPI support
-
 require("dotenv").config();
 const express = require("express");
-const mongoose = require("mongoose");
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const crypto = require("crypto");
 const cors = require("cors");
@@ -11,28 +8,9 @@ const nodemailer = require("nodemailer");
 
 const app = express();
 
-console.log(`Connecting to MongoDB with URI: ${process.env.MONGO_URI}`);
-
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
-.then(() => {
-  const dbName = mongoose.connection.db.databaseName;
-  console.log(`✅ MongoDB connected to database: ${dbName}`);
-})
-.catch((err) => {
-  console.error("❌ MongoDB connection error:", err);
-});
-
-const ApiKeySchema = new mongoose.Schema({
-  userEmail: String,
-  key: String,
-  requests: { type: Number, default: 0 },
-  maxRequests: { type: Number, default: 1000 },
-});
-
-const ApiKey = mongoose.model("ApiKey", ApiKeySchema);
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -42,7 +20,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Stripe webhook to issue keys and email
+// Webhook: Stripe Checkout for your own MongoDB-based key system (optional)
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   let event;
 
@@ -63,9 +41,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
     const apiKey = crypto.randomBytes(24).toString("hex");
 
     try {
-      const keyRecord = await ApiKey.create({ userEmail: email, key: apiKey });
-      console.log(`✅ API Key created for ${email}: ${apiKey}`);
-
+      // Just email, not storing to DB now
       await transporter.sendMail({
         from: `API Service <${process.env.EMAIL_USER}>`,
         to: email,
@@ -74,22 +50,18 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
       });
       console.log(`📧 Email sent to ${email}`);
     } catch (err) {
-      console.error("❌ Error saving API Key or sending email:", err);
+      console.error("❌ Error sending email:", err);
     }
   }
 
   res.status(200).send("Webhook processed");
 });
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
-
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Stripe subscription session creation
+// Stripe Checkout Session (for your own site, optional)
 app.post("/create-checkout-session", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
@@ -114,25 +86,20 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// Protected endpoint supporting both x-api-key (MongoDB) and x-rapidapi-key (RapidAPI)
-app.get("/protected", async (req, res) => {
-  const apiKey = req.headers["x-api-key"] || req.headers["x-rapidapi-key"];
-  if (!apiKey) return res.status(401).json({ error: "API key required" });
+// ✅ RAPIDAPI PROTECTED ENDPOINT
+app.get("/protected", (req, res) => {
+  const apiKey = req.headers["x-rapidapi-key"];
+  const validKey = process.env.RAPIDAPI_KEY;
 
-  const keyData = await ApiKey.findOne({ key: apiKey });
-
-  // If MongoDB API key exists, apply limits
-  if (keyData) {
-    if (keyData.requests >= keyData.maxRequests) {
-      return res.status(429).json({ error: "Quota exceeded" });
-    }
-    keyData.requests += 1;
-    await keyData.save();
-    return res.json({ message: "✅ Access granted via MongoDB key" });
+  if (!apiKey) {
+    return res.status(401).json({ error: "Missing X-RapidAPI-Key header" });
   }
 
-  // If not found in MongoDB, assume it's a RapidAPI key (handled by RapidAPI externally)
-  return res.json({ message: "✅ Access granted via RapidAPI key" });
+  if (apiKey !== validKey) {
+    return res.status(403).json({ error: "Invalid API key" });
+  }
+
+  res.json({ message: "Access granted via RapidAPI ✅" });
 });
 
 const PORT = process.env.PORT || 5000;
