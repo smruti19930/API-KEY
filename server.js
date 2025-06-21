@@ -86,20 +86,16 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// ✅ RAPIDAPI PROTECTED ENDPOINT
+// ✅ RAPIDAPI PROTECTED ENDPOINT (no manual key validation!)
 app.get("/protected", (req, res) => {
   const apiKey = req.headers["x-rapidapi-key"];
-  const validKey = process.env.RAPIDAPI_KEY;
 
   if (!apiKey) {
     return res.status(401).json({ error: "Missing X-RapidAPI-Key header" });
   }
 
-  if (apiKey !== validKey) {
-    return res.status(403).json({ error: "Invalid API key" });
-  }
-
-  res.json({ message: "Access granted via RapidAPI ✅" });
+  // Do NOT validate key manually — RapidAPI handles validation & billing
+  res.json({ message: "✅ Access granted via RapidAPI" });
 });
 
 const PORT = process.env.PORT || 5000;
