@@ -8,12 +8,10 @@ const nodemailer = require("nodemailer");
 
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// ✅ Nodemailer (for Stripe email delivery)
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -22,10 +20,9 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ✅ Stripe Webhook for own site (optional)
+// ✅ Stripe webhook handler
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   let event;
-
   try {
     event = stripe.webhooks.constructEvent(
       req.body,
@@ -58,7 +55,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   res.status(200).send("Webhook processed");
 });
 
-// ✅ Stripe checkout session (optional)
+// Stripe checkout session
 app.post("/create-checkout-session", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
@@ -67,12 +64,10 @@ app.post("/create-checkout-session", async (req, res) => {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
-      line_items: [
-        {
-          price: process.env.STRIPE_PRICE_ID,
-          quantity: 1,
-        },
-      ],
+      line_items: [{
+        price: process.env.STRIPE_PRICE_ID,
+        quantity: 1,
+      }],
       customer_email: email,
       success_url: `${process.env.FRONTEND_URL}/success.html`,
       cancel_url: `${process.env.FRONTEND_URL}/cancel.html`,
@@ -85,27 +80,23 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// ✅ Landing page route (optional)
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// ✅ FINAL RapidAPI-compatible /protected endpoint
+// ✅ FIXED: RapidAPI Protected Endpoint
 app.get("/protected", (req, res) => {
   const apiKey = req.headers["x-rapidapi-key"];
-
   if (!apiKey) {
     return res.status(401).json({ error: "Missing X-RapidAPI-Key header" });
   }
 
-  // ⚠️ DO NOT validate the key manually — RapidAPI does this
-  res.status(200).json({
-    message: "✅ Access granted via RapidAPI",
-    yourKey: apiKey,
-  });
+  // ✅ Don't validate manually
+  res.json({ message: "✅ Access granted via RapidAPI", yourKey: apiKey });
 });
 
-// ✅ Start server
+// Home
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+// Start
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
