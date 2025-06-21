@@ -1,3 +1,5 @@
+// Hybrid server.js with both MongoDB key logic and RapidAPI support
+
 require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
@@ -40,6 +42,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// Stripe webhook to issue keys and email
 app.post("/webhook", express.raw({ type: "application/json" }), async (req, res) => {
   let event;
 
@@ -86,6 +89,7 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// Stripe subscription session creation
 app.post("/create-checkout-session", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
@@ -110,28 +114,25 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// For RapidAPI monetization: bypass MongoDB check if x-rapidapi-key is used
+// Protected endpoint supporting both x-api-key (MongoDB) and x-rapidapi-key (RapidAPI)
 app.get("/protected", async (req, res) => {
-  const apiKey = req.headers["x-api-key"];
-  const rapidKey = req.headers["x-rapidapi-key"];
-
-  if (rapidKey) {
-    // Monetized through RapidAPI - no MongoDB check required
-    return res.json({ message: "Access granted via RapidAPI ✅" });
-  }
-
+  const apiKey = req.headers["x-api-key"] || req.headers["x-rapidapi-key"];
   if (!apiKey) return res.status(401).json({ error: "API key required" });
 
   const keyData = await ApiKey.findOne({ key: apiKey });
-  if (!keyData) return res.status(401).json({ error: "Invalid API key" });
 
-  if (keyData.requests >= keyData.maxRequests) {
-    return res.status(429).json({ error: "Quota exceeded" });
+  // If MongoDB API key exists, apply limits
+  if (keyData) {
+    if (keyData.requests >= keyData.maxRequests) {
+      return res.status(429).json({ error: "Quota exceeded" });
+    }
+    keyData.requests += 1;
+    await keyData.save();
+    return res.json({ message: "✅ Access granted via MongoDB key" });
   }
 
-  keyData.requests += 1;
-  await keyData.save();
-  res.json({ message: "Access granted via Stripe API Key ✅" });
+  // If not found in MongoDB, assume it's a RapidAPI key (handled by RapidAPI externally)
+  return res.json({ message: "✅ Access granted via RapidAPI key" });
 });
 
 const PORT = process.env.PORT || 5000;
