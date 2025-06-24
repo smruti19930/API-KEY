@@ -8,10 +8,12 @@ const nodemailer = require("nodemailer");
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
+// Nodemailer setup
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -55,7 +57,7 @@ app.post("/webhook", express.raw({ type: "application/json" }), async (req, res)
   res.status(200).send("Webhook processed");
 });
 
-// Stripe checkout session
+// ✅ Stripe checkout session
 app.post("/create-checkout-session", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
@@ -80,23 +82,26 @@ app.post("/create-checkout-session", async (req, res) => {
   }
 });
 
-// ✅ FIXED: RapidAPI Protected Endpoint
+// ✅ PROTECTED endpoint for RapidAPI (NO manual API key check!)
 app.get("/protected", (req, res) => {
   const apiKey = req.headers["x-rapidapi-key"];
   if (!apiKey) {
     return res.status(401).json({ error: "Missing X-RapidAPI-Key header" });
   }
 
-  // ✅ Don't validate manually
-  res.json({ message: "✅ Access granted via RapidAPI", yourKey: apiKey });
+  // Let RapidAPI handle key validation
+  res.json({
+    message: "✅ Access granted via RapidAPI",
+    yourKey: apiKey,
+  });
 });
 
-// Home
+// Home route
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-// Start
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
